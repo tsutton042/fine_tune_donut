@@ -32,7 +32,7 @@ def do_train_epoch(model, dataloader, opt):
     av_token_perplexity = 0
     av_token_accuracy = 0
     for bn, batch in tqdm(enumerate(dataloader)):
-        opt.zerograd()  # same forward and backward batch size - change this if too expensive
+        opt.zero_grad()  # same forward and backward batch size - change this if too expensive
         batch_loss, logits, _ = model(**batch)  # transformers auto-calculates loss, which is very nice
         # do backwards pass
         batch_loss.backwards()
