@@ -16,7 +16,7 @@ def av_batch_accuracy(logits, actual_tokens):
     For a batch, calculate the average accuracy per-token
     """
     most_probable_tokens = logits.softmax(dim=2).argmax(dim=2).squeeze(0)
-    pred_equal = most_probable_tokens.eq(actual_tokens).astype(torch.unit8)
+    pred_equal = most_probable_tokens.eq(actual_tokens).type(torch.uint8)
     per_word_accuracy = pred_equal.sum(dim=1)/pred_equal.shape[1] 
     av_batch_accuracy = per_word_accuracy.mean(dim=0)
     return av_batch_accuracy
@@ -33,9 +33,11 @@ def do_train_epoch(model, dataloader, opt):
     av_token_accuracy = 0
     for bn, batch in tqdm(enumerate(dataloader)):
         opt.zero_grad()  # same forward and backward batch size - change this if too expensive
-        batch_loss, logits, _ = model(**batch)  # transformers auto-calculates loss, which is very nice
+        embeds = model(**batch)
+        batch_loss = embeds["loss"] 
+        logits = embeds["logits"]
         # do backwards pass
-        batch_loss.backwards()
+        batch_loss.backward()
         opt.step()
         # update epoch values
         loss += batch_loss
@@ -59,7 +61,9 @@ def do_val_epoch(model, dataloader):
     av_token_perplexity = 0
     av_token_accuracy = 0
     for bn, batch in tqdm(enumerate(dataloader)):
-        batch_loss, logits, _ = model(**batch)  # transformers auto-calculate loss
+        embeds = model(**batch)
+        batch_loss = embeds["loss"] 
+        logits = embeds["logits"]
         # update epoch values
         val_loss += batch_loss
         av_token_perplexity += av_batch_perplexity(logits)
