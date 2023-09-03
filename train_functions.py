@@ -32,17 +32,21 @@ def do_train_epoch(model, dataloader, opt):
     av_token_perplexity = 0
     av_token_accuracy = 0
     for bn, batch in tqdm(enumerate(dataloader)):
-        opt.zero_grad()  # same forward and backward batch size - change this if too expensive
-        embeds = model(**batch)
-        batch_loss = embeds["loss"] 
-        logits = embeds["logits"]
-        # do backwards pass
-        batch_loss.backward()
-        opt.step()
+        with torch.autocast(device_type="cpu", dtype=torch.bfloat16):  # forwards & backwards in bf16
+            opt.zero_grad(set_to_none=True)  # same forward and backward batch size - change this if too expensive
+            embeds = model(**batch)
+            batch_loss = embeds["loss"] 
+            logits = embeds["logits"]
+            del embeds  # free up redundant memory
+            # do backwards pass
+            batch_loss.backward()
+            opt.step()
         # update epoch values
         loss += batch_loss
+        del batch_loss  # free up redundant memory - hoping this reduces graph overheads
         av_token_perplexity += av_batch_perplexity(logits)
         av_token_accuracy += av_batch_accuracy(logits, batch["labels"])
+        del logits  # free up redundant memory
     # average the metrics over all batches - bn is the number of batches - 1 now
     # so bn + 1 is number of batches
     loss /= bn + 1
