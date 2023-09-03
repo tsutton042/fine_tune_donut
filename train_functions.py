@@ -1,5 +1,5 @@
 import torch
-import tqdm
+from tqdm import tqdm
 
 def av_batch_perplexity(logits):
     """
