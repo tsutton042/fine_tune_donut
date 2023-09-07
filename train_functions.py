@@ -42,10 +42,10 @@ def do_train_epoch(model, dataloader, opt):
             batch_loss.backward()
             opt.step()
         # update epoch values
-        loss += batch_loss
+        loss += batch_loss.detach()
         del batch_loss  # free up redundant memory - hoping this reduces graph overheads
-        av_token_perplexity += av_batch_perplexity(logits)
-        av_token_accuracy += av_batch_accuracy(logits, batch["labels"])
+        av_token_perplexity += av_batch_perplexity(logits.detach())
+        av_token_accuracy += av_batch_accuracy(logits.detach(), batch["labels"].detach())
         del logits  # free up redundant memory
     # average the metrics over all batches - bn is the number of batches - 1 now
     # so bn + 1 is number of batches
@@ -64,14 +64,15 @@ def do_val_epoch(model, dataloader):
     # store additional metrics
     av_token_perplexity = 0
     av_token_accuracy = 0
-    for bn, batch in tqdm(enumerate(dataloader)):
-        embeds = model(**batch)
-        batch_loss = embeds["loss"] 
-        logits = embeds["logits"]
-        # update epoch values
-        val_loss += batch_loss
-        av_token_perplexity += av_batch_perplexity(logits)
-        av_token_accuracy += av_batch_accuracy(logits, batch["labels"])
+    with torch.no_grad():
+        for bn, batch in tqdm(enumerate(dataloader)):
+            embeds = model(**batch)
+            batch_loss = embeds["loss"] 
+            logits = embeds["logits"]
+            # update epoch values
+            val_loss += batch_loss.detach()
+            av_token_perplexity += av_batch_perplexity(logits.detach())
+            av_token_accuracy += av_batch_accuracy(logits.detach(), batch["labels"].detach())
     # average the metrics over all batches - bn is the number of batches - 1 now
     # so bn + 1 is number of batches
     val_loss /= bn + 1
@@ -85,8 +86,8 @@ def summary_string(results_dict, results_type = "train"):
     Parses the results of an epoch into an easily readable string
     """
     assert isinstance(results_type, str), f"results_type must be a str, got {type(results_type)} instead" 
-    train_res = [f"{name}: {value}, " for name, value in results_dict.items()]
-    summary = "train".join(train_res)
+    train_res = [f"{name}: {round(value, 5)}, " for name, value in results_dict.items()]
+    summary = f"{results_type} ".join(train_res)
     return summary
 
 
@@ -102,8 +103,8 @@ def train_model(model, train_loader, optimiser, val_loader = None, n_epochs = 5)
         print(summary)
         # do validation pass
         if val_loader is not None:
-            val_metrics = do_val_epoch(model, val_loader, optimiser)
+            val_metrics = do_val_epoch(model, val_loader)
             # create the summary string
-            val_summary = f"Epoch {epoch} val " + summary_string(val_metrics)
+            val_summary = f"Epoch {epoch} val " + summary_string(val_metrics, "val")
             print(val_summary)
         print("="*80)
