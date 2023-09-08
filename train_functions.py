@@ -86,7 +86,7 @@ def summary_string(results_dict, results_type = "train"):
     Parses the results of an epoch into an easily readable string
     """
     assert isinstance(results_type, str), f"results_type must be a str, got {type(results_type)} instead" 
-    train_res = [f"{name}: {round(value, 5)}, " for name, value in results_dict.items()]
+    train_res = [f"{name}: {round(value.item(), 5)}, " for name, value in results_dict.items()]
     summary = f"{results_type} ".join(train_res)
     return summary
 
@@ -95,16 +95,24 @@ def train_model(model, train_loader, optimiser, val_loader = None, n_epochs = 5)
     """
     Train the model on the train dataset, using the validation dataset to validate the model results
     """
+    train_summ = []
+    val_summ = [] if val_loader is not None else None
     for epoch in range(n_epochs):
         print("="*80)
         train_metrics = do_train_epoch(model, train_loader, optimiser)
+        train_summ.append(train_metrics)
         # create the summary string
         summary = f"Epoch {epoch} train " + summary_string(train_metrics)
         print(summary)
         # do validation pass
         if val_loader is not None:
             val_metrics = do_val_epoch(model, val_loader)
+            val_summ.append(val_metrics)
             # create the summary string
             val_summary = f"Epoch {epoch} val " + summary_string(val_metrics, "val")
             print(val_summary)
         print("="*80)
+    results = {"train_stats": train_summ}
+    if val_loader is not None:
+        results["val_stats"] = val_summ
+    return results
